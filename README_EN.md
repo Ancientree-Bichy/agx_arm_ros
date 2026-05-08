@@ -797,6 +797,20 @@ Message type: `agx_arm_msgs/MoveMITMsg`
 | `kd` | `float64[]` | Velocity gain array |
 | `torque` | `float64[]` | Desired joint torque array (unit: Newton-meters, N·m) |
 
+**Parameter ranges and recommended values (`move_mit`):**
+
+| Parameter | Range | Recommended value |
+|-----------|-------|-------------------|
+| `p_des` | `[-12.5, 12.5]` | `—` |
+| `v_des` | `[-45.0, 45.0]` | `—` |
+| `kp` | `[0.0, 500.0]` | `10.0` |
+| `kd` | `[-5.0, 5.0]` | `0.8` |
+
+The `torque` (`MoveMITMsg.torque`) range is not fixed. It depends on the robot model and joint index. Check the corresponding model docs:
+
+- [Piper Series](https://github.com/agilexrobotics/pyAgxArm/blob/master/docs/piper/piper_api.md#single-joint-mit-control--move_mit)
+- [Nero](https://github.com/agilexrobotics/pyAgxArm/blob/master/docs/nero/nero_api.md#single-joint-mit-control--move_mit)
+
 > **Note:** All array fields must have the same length as `joint_index`. Supports simultaneous control of multiple joints.
 
 #### `/control/hand` Details

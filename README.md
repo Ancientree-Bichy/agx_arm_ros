@@ -801,6 +801,20 @@ ros2 topic pub /control/joint_states sensor_msgs/msg/JointState \
 | `kd` | `float64[]` | 速度增益数组 |
 | `torque` | `float64[]` | 期望关节力矩数组（单位：牛·米，N·m） |
 
+**参数范围与推荐值（`move_mit`）：**
+
+| 参数 | 范围 | 推荐值 |
+|------|------|--------|
+| `p_des` | `[-12.5, 12.5]` | `—` |
+| `v_des` | `[-45.0, 45.0]` | `—` |
+| `kp` | `[0.0, 500.0]` | `10.0` |
+| `kd` | `[-5.0, 5.0]` | `0.8` |
+
+`torque`（`MoveMITMsg.torque`）范围不固定，和机械臂型号及关节索引相关，请按机型文档跳转查询：
+
+- [Piper系列](https://github.com/agilexrobotics/pyAgxArm/blob/master/docs/piper/piper_api.md#%E5%8D%95%E5%85%B3%E8%8A%82-mit-%E6%8E%A7%E5%88%B6--move_mit)
+- [Nero](https://github.com/agilexrobotics/pyAgxArm/blob/master/docs/nero/nero_api.md#%E5%8D%95%E5%85%B3%E8%8A%82-mit-%E6%8E%A7%E5%88%B6--move_mit)
+
 > **注意：** 所有数组字段长度需与 `joint_index` 一致，支持同时控制多个关节。
 
 #### `/control/hand` 详细说明
