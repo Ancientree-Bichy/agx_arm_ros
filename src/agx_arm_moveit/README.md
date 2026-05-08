@@ -128,7 +128,53 @@ ros2 launch agx_arm_ctrl start_single_agx_arm_moveit.launch.py can_port:=can0 ar
 > 该 launch 支持所有 `agx_arm_ctrl` 参数（如 `tcp_offset`、`speed_percent`、`auto_enable` 等），详见 [agx_arm_ctrl 启动参数](../../README.md#启动参数)。
 > - `follow` 默认为 `true`，MoveIt 自动订阅 `/feedback/joint_states` 跟随真实臂状态
 > - `publish_gripper_joint` 自动设为 `false`，不发布 `gripper`（夹爪宽度）关节，避免 URDF 中不存在该关节名导致的 MoveIt 告警
+> - `auto_control_gate` 默认为 `false`：默认不启用自动门控；此时会自动将 `control_enabled` 设为 `true`（允许控制）。
+> - 当 `auto_control_gate:=true` 时：会启动 `agx_arm_control_gate`，并将 `control_enabled` 自动设为 `false`，仅在轨迹执行阶段通过 `/control_enable` 自动开门。
 > - 需要多机械臂并行时，可为该 launch 指定 `namespace`（例如 `namespace:=piper_x`）
+
+#### 3.2.1 MoveIt 门控机制说明（`auto_control_gate`）
+
+为避免 MoveIt 空闲阶段持续发布控制相关话题对真机造成占用，`start_single_agx_arm_moveit.launch.py` 提供了执行期门控能力：
+
+- **门控服务**：`/control_enable`（`std_srvs/SetBool`），由 `agx_arm_ctrl` 提供
+- **驱动参数**：`control_enabled`
+- **MoveIt 门控节点**：`agx_arm_control_gate`（位于 `agx_arm_moveit/scripts`）
+
+工作机制：
+
+1. 当 `auto_control_gate:=false`（默认）时，不启动自动门控节点，且 `control_enabled` 自动设为 `true`，控制链路常开。
+2. 当 `auto_control_gate:=true` 时，自动门控节点监听 `arm_controller/follow_joint_trajectory` 执行状态，仅在执行阶段通过 `/control_enable` 开门，执行结束自动关门。
+
+与 `follow:=true` 搭配时，MoveIt 会订阅 `/feedback/joint_states`，以实机真实关节状态作为规划参考，从而在实机当前姿态附近进行规划与执行；但执行前仍受状态更新时间与起点一致性校验影响。
+
+推荐应用场景：
+
+- **场景 A（默认，快速联调）**：连续调试、频繁执行，优先易用性  
+  使用 `auto_control_gate:=false`
+- **场景 B（实机安全优先）**：希望只在真实执行时放行控制，降低空闲占用风险  
+  使用 `auto_control_gate:=true`
+
+启动示例：
+
+```bash
+# 场景 A：默认（自动门控关闭，控制常开）
+ros2 launch agx_arm_ctrl start_single_agx_arm_moveit.launch.py \
+  can_port:=can0 arm_type:=piper effector_type:=agx_gripper
+
+# 场景 B：执行期自动门控（推荐实机）
+ros2 launch agx_arm_ctrl start_single_agx_arm_moveit.launch.py \
+  can_port:=can0 arm_type:=piper effector_type:=agx_gripper auto_control_gate:=true
+```
+
+手动门控调试命令：
+
+```bash
+# 开门（允许 /control/*）
+ros2 service call /control_enable std_srvs/srv/SetBool "{data: true}"
+
+# 关门（拒绝 /control/*）
+ros2 service call /control_enable std_srvs/srv/SetBool "{data: false}"
+```
 
 #### 方式二：分步启动
 
@@ -157,6 +203,7 @@ ros2 launch agx_arm_moveit demo.launch.py arm_type:=nero effector_type:=revo2 re
 | `namespace` | 空字符串 | 当前 MoveIt/控制实例命名空间（多实例推荐设置） | 任意合法 ROS 命名空间 |
 | `follow` | `false` | 跟随真实机械臂状态（`true` 时 MoveIt 订阅 `/feedback/joint_states`；`false` 时订阅 `/control/joint_states`） | `true`, `false` |
 | `tcp_offset` | `[0.0, 0.0, 0.0, 0.0, 0.0, 0.0]` | TCP 偏移 [x, y, z, rx, ry, rz]（米/弧度），非零时规划目标和交互标记移至 TCP 位置 | - |
+| `auto_control_gate` | `false` | 是否启用 MoveIt 执行期自动门控（通过 `/control_enable` 开关 `/control/*`） | `true`, `false` |
 | `use_rviz` | `true` | 是否启动 RViz | `true`, `false` |
 | `db` | `false` | 是否启动 MoveIt warehouse 数据库 | `true`, `false` |
 

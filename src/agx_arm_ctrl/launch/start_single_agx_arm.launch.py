@@ -92,6 +92,12 @@ def generate_launch_description():
         description='Publish "gripper" (opening width) joint in /feedback/joint_states. '
                     'Set false when used with MoveIt (URDF only has gripper_joint1/2).',
     )
+    control_enabled_arg = DeclareLaunchArgument(
+        'control_enabled',
+        default_value='true',
+        choices=['true', 'false'],
+        description='Whether to accept /control/* commands.',
+    )
 
     # node
     agx_arm_node = Node(
@@ -113,6 +119,7 @@ def generate_launch_description():
             'tcp_offset': LaunchConfiguration('tcp_offset'),
             'gripper_default_effort': LaunchConfiguration('gripper_default_effort'),
             'publish_gripper_joint': LaunchConfiguration('publish_gripper_joint'),
+            'control_enabled': LaunchConfiguration('control_enabled'),
         }],
         remappings=[
             # feedback topics
@@ -136,6 +143,7 @@ def generate_launch_description():
 
             # services
             ('enable_agx_arm', 'enable_agx_arm'),
+            ('control_enable', 'control_enable'),
             ('move_home', 'move_home'),
             ('emergency_stop', 'emergency_stop'),
             ('exit_teach_mode', 'exit_teach_mode'),
@@ -157,6 +165,7 @@ def generate_launch_description():
         tcp_offset_arg,
         gripper_default_effort_arg,
         publish_gripper_joint_arg,
+        control_enabled_arg,
         # node
         agx_arm_node,
     ])

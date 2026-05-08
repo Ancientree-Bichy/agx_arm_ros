@@ -2,7 +2,7 @@ from launch import LaunchDescription
 from launch.actions import (
     DeclareLaunchArgument, IncludeLaunchDescription,
 )
-from launch.substitutions import LaunchConfiguration
+from launch.substitutions import LaunchConfiguration, IfElseSubstitution
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 import os
 from ament_index_python.packages import get_package_share_directory
@@ -100,6 +100,12 @@ def generate_launch_description():
         choices=['true', 'false'],
         description='Follow real arm state.',
     )
+    auto_control_gate_arg = DeclareLaunchArgument(
+        'auto_control_gate',
+        default_value='false',
+        choices=['true', 'false'],
+        description='Open control gate only during MoveIt execute stage.',
+    )
 
     # ── agx_arm_ctrl ─────────────────────────────────────────────────
     agx_arm_launch = IncludeLaunchDescription(
@@ -124,6 +130,11 @@ def generate_launch_description():
             'tcp_offset': LaunchConfiguration('tcp_offset'),
             'gripper_default_effort': LaunchConfiguration('gripper_default_effort'),
             'publish_gripper_joint': 'false',
+            'control_enabled': IfElseSubstitution(
+                LaunchConfiguration('auto_control_gate'),
+                if_value='false',
+                else_value='true',
+            ),
         }.items(),
     )
 
@@ -143,6 +154,7 @@ def generate_launch_description():
             'revo2_type': LaunchConfiguration('revo2_type'),
             'tcp_offset': LaunchConfiguration('tcp_offset'),
             'follow': LaunchConfiguration('follow'),
+            'auto_control_gate': LaunchConfiguration('auto_control_gate'),
         }.items(),
     )
 
@@ -162,6 +174,7 @@ def generate_launch_description():
         tcp_offset_arg,
         gripper_default_effort_arg,
         follow_arg,
+        auto_control_gate_arg,
         # launches
         agx_arm_launch,
         moveit_launch,

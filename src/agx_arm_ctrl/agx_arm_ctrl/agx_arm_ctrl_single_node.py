@@ -89,6 +89,7 @@ class AgxArmRosNode(Node):
         self.declare_parameter("tcp_offset", [0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
         self.declare_parameter("gripper_default_effort", 1.0)
         self.declare_parameter("publish_gripper_joint", True)
+        self.declare_parameter("control_enabled", True)
 
     def _load_parameters(self):
         self.can_port = self.get_parameter("can_port").value
@@ -102,6 +103,7 @@ class AgxArmRosNode(Node):
         self.tcp_offset = self.get_parameter("tcp_offset").value
         self.gripper_default_effort = self.get_parameter("gripper_default_effort").value
         self.publish_gripper_joint = self.get_parameter("publish_gripper_joint").value
+        self.control_enabled = self.get_parameter("control_enabled").value
 
         if self.arm_type not in ArmModel.__dict__.values():
             self.get_logger().error(
@@ -126,6 +128,7 @@ class AgxArmRosNode(Node):
         self._control_ready_logged = False
         self.arm_joint_names = list()
         self.arm_joint_count = 0
+        self._control_gate_block_logged = False
 
     def _log_parameters(self):
         self.get_logger().info(f"can_port: {self.can_port}")
@@ -139,6 +142,7 @@ class AgxArmRosNode(Node):
         self.get_logger().info(f"tcp_offset: {self.tcp_offset}")
         self.get_logger().info(f"gripper_default_effort: {self.gripper_default_effort}")
         self.get_logger().info(f"publish_gripper_joint: {self.publish_gripper_joint}")
+        self.get_logger().info(f"control_enabled: {self.control_enabled}")
 
     def _init_agx_arm(self):
         config: PiperCanDefaultConfig = create_agx_arm_config(
@@ -268,6 +272,7 @@ class AgxArmRosNode(Node):
 
     def _setup_services(self):
         self.create_service(SetBool, "enable_agx_arm", self._enable_callback)
+        self.create_service(SetBool, "control_enable", self._control_gate_callback)
         self.create_service(Empty, "move_home", self._move_home_callback)
         self.create_service(Empty, "emergency_stop", self._emergency_stop_callback)
         if not self.is_switch_seamlessly:
@@ -304,6 +309,14 @@ class AgxArmRosNode(Node):
         if not self.enable_flag:
             self.get_logger().warn("Agx_arm is not enabled, cannot control")
             return False
+        if not self.control_enabled:
+            if not self._control_gate_block_logged:
+                self.get_logger().info(
+                    "External control gate is closed, ignore control commands"
+                )
+                self._control_gate_block_logged = True
+            return False
+        self._control_gate_block_logged = False
         if not self.is_switch_seamlessly:
             arm_status = self.agx_arm.get_arm_status()
             if arm_status is not None and arm_status.msg.ctrl_mode == self.agx_arm.ARM_STATUS.CtrlMode.TEACHING_MODE:
@@ -823,6 +836,15 @@ class AgxArmRosNode(Node):
                     self.get_logger().info("Agx_arm moved to home position successfully")
         except Exception as e:
             self.get_logger().error(f"Failed to move to home position: {str(e)}")
+        return response
+
+    def _control_gate_callback(self, request, response):
+        self.control_enabled = request.data
+        self._control_gate_block_logged = False
+        state = "opened" if request.data else "closed"
+        response.success = True
+        response.message = f"External control gate {state}"
+        self.get_logger().info(response.message)
         return response
 
     def _emergency_stop_callback(self, request, response):
