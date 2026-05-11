@@ -130,7 +130,53 @@ ros2 launch agx_arm_ctrl start_single_agx_arm_moveit.launch.py can_port:=can0 ar
 > This launch supports all `agx_arm_ctrl` parameters (e.g. `tcp_offset`, `speed_percent`, `auto_enable`, etc.). See [agx_arm_ctrl Launch Parameters](../../README_EN.md#launch-parameters) for details.
 > - `follow` defaults to `true`, so MoveIt subscribes to `feedback_topic` (default: `feedback/joint_states`) to track real arm state
 > - `publish_gripper_joint` is automatically set to `false`, suppressing the `gripper` (opening width) joint that does not exist in the URDF, preventing MoveIt warnings
+> - `auto_control_gate` defaults to `false`: automatic gating is disabled by default; in this mode, `control_enabled` is automatically set to `true` (control allowed).
+> - When `auto_control_gate:=true`: `agx_arm_control_gate` is launched and `control_enabled` is automatically set to `false`; `/control_enable` will be toggled automatically during trajectory execution.
 > - For multi-arm parallel use, you can set `namespace` for this launch (e.g. `namespace:=piper_x`)
+
+#### 3.2.1 MoveIt Gating Mechanism (`auto_control_gate`)
+
+To avoid continuous control-topic occupation of the real arm while MoveIt is idle, `start_single_agx_arm_moveit.launch.py` provides execution-phase control gating:
+
+- **Gate service**: `/control_enable` (`std_srvs/SetBool`), provided by `agx_arm_ctrl`
+- **Driver parameter**: `control_enabled`
+- **MoveIt gate node**: `agx_arm_control_gate` (located in `agx_arm_moveit/scripts`)
+
+How it works:
+
+1. When `auto_control_gate:=false` (default), the auto gate node is not started, and `control_enabled` is automatically set to `true` (control path always open).
+2. When `auto_control_gate:=true`, the auto gate node monitors `arm_controller/follow_joint_trajectory` execution status and toggles `/control_enable` only during execution (open while executing, close after completion).
+
+When combined with `follow:=true`, MoveIt subscribes to `/feedback/joint_states` and plans against the real joint state, so planning/execution is based on the arm's current physical pose; however, execution still depends on state update timing and start-state consistency checks.
+
+Recommended scenarios:
+
+- **Scenario A (default, fast iteration)**: frequent debugging and repeated execution, prioritizing convenience  
+  Use `auto_control_gate:=false`
+- **Scenario B (real-arm safety first)**: allow control only during actual execution to reduce idle occupation risk  
+  Use `auto_control_gate:=true`
+
+Launch examples:
+
+```bash
+# Scenario A: default (auto gate disabled, control always open)
+ros2 launch agx_arm_ctrl start_single_agx_arm_moveit.launch.py \
+  can_port:=can0 arm_type:=piper effector_type:=agx_gripper
+
+# Scenario B: execution-phase automatic gating (recommended for real hardware)
+ros2 launch agx_arm_ctrl start_single_agx_arm_moveit.launch.py \
+  can_port:=can0 arm_type:=piper effector_type:=agx_gripper auto_control_gate:=true
+```
+
+Manual gate control for debugging:
+
+```bash
+# Open gate (allow /control/*)
+ros2 service call /control_enable std_srvs/srv/SetBool "{data: true}"
+
+# Close gate (block /control/*)
+ros2 service call /control_enable std_srvs/srv/SetBool "{data: false}"
+```
 
 #### Option 2: Step-by-Step Launch
 
@@ -161,6 +207,7 @@ ros2 launch agx_arm_moveit demo.launch.py arm_type:=nero effector_type:=revo2 re
 | `feedback_topic` | `feedback/joint_states` | Joint feedback topic (used when `follow:=true`) | Any valid ROS topic |
 | `control_topic` | `control/joint_states` | Joint control topic (used when `follow:=false`, and for ros2_control `joint_states` remap) | Any valid ROS topic |
 | `tcp_offset` | `[0.0, 0.0, 0.0, 0.0, 0.0, 0.0]` | TCP offset [x, y, z, rx, ry, rz] in meters/radians. When non-zero, the planning target and interactive marker align with the TCP position | - |
+| `auto_control_gate` | `false` | Enable MoveIt execution-phase automatic control gating (toggle `/control/*` via `/control_enable`) | `true`, `false` |
 | `use_rviz` | `true` | Whether to launch RViz | `true`, `false` |
 | `db` | `false` | Whether to start MoveIt warehouse database | `true`, `false` |
 
