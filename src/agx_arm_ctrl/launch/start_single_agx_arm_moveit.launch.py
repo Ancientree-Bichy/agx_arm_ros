@@ -100,11 +100,30 @@ def generate_launch_description():
         choices=['true', 'false'],
         description='Follow real arm state.',
     )
+
+    feedback_topic_arg = DeclareLaunchArgument(
+        'feedback_topic',
+        default_value='feedback/joint_states',
+        description='Joint states feedback topic for MoveIt (follow:=true).',
+    )
+
+    control_topic_arg = DeclareLaunchArgument(
+        'control_topic',
+        default_value='control/joint_states',
+        description='Joint states control topic for MoveIt (follow:=false, ros2_control remap).',
+    )
+
     auto_control_gate_arg = DeclareLaunchArgument(
         'auto_control_gate',
         default_value='false',
         choices=['true', 'false'],
         description='Open control gate only during MoveIt execute stage.',
+    )
+
+    control_gate_service_arg = DeclareLaunchArgument(
+        'control_gate_service',
+        default_value='control_enable',
+        description='SetBool gate service for agx_arm_control_gate when auto_control_gate:=true.',
     )
 
     # ── agx_arm_ctrl ─────────────────────────────────────────────────
@@ -154,7 +173,10 @@ def generate_launch_description():
             'revo2_type': LaunchConfiguration('revo2_type'),
             'tcp_offset': LaunchConfiguration('tcp_offset'),
             'follow': LaunchConfiguration('follow'),
+            'feedback_topic': LaunchConfiguration('feedback_topic'),
+            'control_topic': LaunchConfiguration('control_topic'),
             'auto_control_gate': LaunchConfiguration('auto_control_gate'),
+            'control_gate_service': LaunchConfiguration('control_gate_service'),
         }.items(),
     )
 
@@ -174,7 +196,10 @@ def generate_launch_description():
         tcp_offset_arg,
         gripper_default_effort_arg,
         follow_arg,
+        feedback_topic_arg,
+        control_topic_arg,
         auto_control_gate_arg,
+        control_gate_service_arg,
         # launches
         agx_arm_launch,
         moveit_launch,
