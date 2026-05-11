@@ -39,8 +39,18 @@ def declare_common_args():
             default_value="false",
             choices=["true", "false"],
             description="Follow real arm state. "
-            "true: move_group subscribes to feedback/joint_states; "
-            "false: subscribes to control/joint_states (mock hardware).",
+            "true: move_group subscribes to feedback_topic; "
+            "false: subscribes to control_topic (mock hardware).",
+        ),
+        DeclareLaunchArgument(
+            "feedback_topic",
+            default_value="feedback/joint_states",
+            description="Joint states feedback topic (used when follow:=true).",
+        ),
+        DeclareLaunchArgument(
+            "control_topic",
+            default_value="control/joint_states",
+            description="Joint states control topic (used when follow:=false, and for ros2_control_node).",
         ),
     ]
 

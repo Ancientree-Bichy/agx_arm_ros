@@ -206,10 +206,10 @@ ros2 launch agx_arm_ctrl start_single_agx_arm_rviz.launch.py can_port:=can0 arm_
 ```
 
 > **注意：**
-> - `start_single_agx_arm_rviz.launch` 会订阅 `/feedback/joint_states` 话题；通过参数 `control` 可控制是否从 RViz 侧发布到 `control_topic`（默认 `control_topic:=/control/joint_states`，且默认 `control:=false`，不会从 RViz 发布控制话题）。
-> - `follow` 用于控制 RViz 是否跟随真实机械臂状态；设为 `true` 时，将订阅真实反馈并驱动模型显示。
+> - `start_single_agx_arm_rviz.launch` 会根据 `follow` 订阅关节状态：`follow:=true` 时订阅 `feedback_topic`（默认 `feedback/joint_states`），`follow:=false` 时订阅 `control_topic`（默认 `control/joint_states`）；通过参数 `control` 可控制是否从 RViz 侧发布到 `control_topic`（默认 `control:=false`，不会从 RViz 发布控制话题）。
+> - `follow` 用于控制 RViz 是否跟随真实机械臂状态；设为 `true` 时，使用 `feedback_topic` 驱动模型显示。
 > - 若希望仅用于可视化跟随真实机械臂状态，推荐保持 `control:=false`；
-> - 若希望使用 RViz 自带的关节滑条控制 `control_topic`（默认 `/control/joint_states`），可显式设置 `control:=true`，此时可能会与 [控制示例](#控制示例) 中的控制指令产生冲突。
+> - 若希望使用 RViz 自带的关节滑条控制 `control_topic`（默认 `control/joint_states`），可显式设置 `control:=true`，此时可能会与 [控制示例](#控制示例) 中的控制指令产生冲突。
 
 **MoveIt 一键启动（臂控 + MoveIt + RViz）：**
 
@@ -217,7 +217,7 @@ ros2 launch agx_arm_ctrl start_single_agx_arm_rviz.launch.py can_port:=can0 arm_
 ros2 launch agx_arm_ctrl start_single_agx_arm_moveit.launch.py can_port:=can0 arm_type:=piper effector_type:=agx_gripper
 ```
 
-> 该 launch 文件同时启动机械臂控制节点和 MoveIt2，自动将关节反馈 (`/feedback/joint_states`) 接入 MoveIt，无需手动分两个终端启动。支持所有 `agx_arm_ctrl` 的参数（如 `tcp_offset`、`speed_percent` 等），详见 [Moveit](./src/agx_arm_moveit/README.md)。
+> 该 launch 文件同时启动机械臂控制节点和 MoveIt2，默认将关节反馈 (`feedback_topic:=feedback/joint_states`) 接入 MoveIt，也支持通过 `feedback_topic`/`control_topic` 自定义话题，无需手动分两个终端启动。支持所有 `agx_arm_ctrl` 的参数（如 `tcp_offset`、`speed_percent` 等），详见 [Moveit](./src/agx_arm_moveit/README.md)。
 
 ### 启动参数
 
@@ -276,10 +276,11 @@ ros2 launch agx_arm_description display.launch.py arm_type:=piper
 | `pub_rate` | `200` | 状态发布频率 (Hz) |
 | `gui` | `true` | 是否启用 joint_state_publisher_gui 关节滑条控制界面 |
 | `rvizconfig` | 内置配置 | 自定义 RViz 配置文件的绝对路径 |
-| `follow` | `false` | 是否跟随真实机械臂状态（订阅 `/feedback/joint_states`，并在 robot_state_publisher 中重映射 `/joint_states` 为 `feedback/joint_states`） |
+| `follow` | `false` | 是否跟随真实机械臂状态（`true` 时订阅 `feedback_topic`；`false` 时订阅 `control_topic`，并在 robot_state_publisher 中重映射 `/joint_states`） |
 | `tcp_offset` | `[0.0, 0.0, 0.0, 0.0, 0.0, 0.0]` | TCP 偏移 [x, y, z, rx, ry, rz]（米/弧度）。非零时自动发布 `tcp_link` 坐标系 |
 | `control` | `true` | 是否通过 joint_state_publisher（或 GUI 版本）发布控制话题：`true` 时发布到 `control_topic`；`false` 时仅用于跟随或显示，不发布控制话题。与 `follow:=true` 配合时，常用组合为 `follow:=true, control:=false`（只跟随真实机械臂，不从 RViz 发出控制） |
-| `control_topic` | `/control/joint_states` | RViz 关节滑条输出（`joint_state_publisher_gui`）发布到的目标话题 |
+| `feedback_topic` | `feedback/joint_states` | 反馈关节状态话题（`follow:=true` 时使用） |
+| `control_topic` | `control/joint_states` | RViz 关节滑条输出（`joint_state_publisher_gui`）发布到的目标话题，也是 `follow:=false` 时显示侧订阅的话题 |
 
 #### 典型应用组合示例（follow / control）
 
@@ -516,7 +517,7 @@ cd src/agx_arm_ros
 4. 主导臂关节角度(主导臂模式下使用)
 
     ```bash
-    ros2 topic echo /feedback/leader_joint_angles
+    ros2 topic echo /feedback/leader_joint_states
     ```
 
 5. 夹爪状态
@@ -542,7 +543,7 @@ cd src/agx_arm_ros
 | `/feedback/joint_states` | `sensor_msgs/JointState` | 关节状态 | 始终可用 |
 | `/feedback/tcp_pose` | `geometry_msgs/PoseStamped` | TCP 位姿 | 始终可用 |
 | `/feedback/arm_status` | `agx_arm_msgs/AgxArmStatus` | 机械臂状态 | 始终可用 |
-| `/feedback/leader_joint_angles` | `sensor_msgs/JointState` | 主导臂关节角度 | 主导臂模式 |
+| `/feedback/leader_joint_states` | `sensor_msgs/JointState` | 主导臂关节状态 | 主导臂模式 |
 | `/feedback/gripper_status` | `agx_arm_msgs/GripperStatus` | 夹爪状态 | 配置 AgxGripper |
 | `/feedback/hand_status` | `agx_arm_msgs/HandStatus` | 灵巧手状态 | 配置 Revo2 |
 

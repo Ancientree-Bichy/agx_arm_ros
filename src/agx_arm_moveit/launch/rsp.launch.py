@@ -13,9 +13,9 @@ from _moveit_config_builder import build_moveit_config, declare_common_args
 
 def _launch(context):
     follow = LaunchConfiguration("follow").perform(context)
-    joint_states_topic = (
-        "feedback/joint_states" if follow == "true" else "control/joint_states"
-    )
+    feedback_topic = LaunchConfiguration("feedback_topic").perform(context)
+    control_topic = LaunchConfiguration("control_topic").perform(context)
+    joint_states_topic = str(feedback_topic) if follow == "true" else str(control_topic)
 
     moveit_config = build_moveit_config(context)
 

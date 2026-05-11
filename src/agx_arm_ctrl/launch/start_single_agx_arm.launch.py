@@ -119,7 +119,7 @@ def generate_launch_description():
             ('feedback/joint_states', 'feedback/joint_states'),
             ('feedback/tcp_pose', 'feedback/tcp_pose'),
             ('feedback/arm_status', 'feedback/arm_status'),
-            ('feedback/leader_joint_angles', 'feedback/leader_joint_angles'),
+            ('feedback/leader_joint_states', 'feedback/leader_joint_states'),
             ('feedback/gripper_status', 'feedback/gripper_status'),
             ('feedback/hand_status', 'feedback/hand_status'),
 

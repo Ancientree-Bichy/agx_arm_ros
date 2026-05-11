@@ -153,43 +153,48 @@ class AgxArmRosNode(Node):
         if self.auto_enable:
             if not self._enable_arm(True, self.enable_timeout):
                 self.get_logger().error("Failed to auto-enable the arm")
+        else:
+            time.sleep(0.1)
+            self.enable_flag = self.agx_arm.get_joint_enable_status(255)
 
-            start_time = time.time()
-            while time.time() - start_time < self.enable_timeout:
-                self.firmware = self.agx_arm.get_firmware()
-                if self.firmware:
-                    break
-                time.sleep(0.005)
-            
+        start_time = time.time()
+        while time.time() - start_time < self.enable_timeout:
+            self.firmware = self.agx_arm.get_firmware()
             if self.firmware:
-                current_version = self.firmware['software_version']
-                self.get_logger().info(f"firmware version: {current_version}")
-                firmeware_version = PiperFW.DEFAULT
-                if self.is_piper:
-                    if current_version < "S-V1.8-5":
-                        self.is_switch_seamlessly = False
-                    if current_version > "S-V1.8-2" and current_version < "S-V1.8-8":
-                        firmeware_version = PiperFW.V183
-                    elif current_version >= "S-V1.8-8":
-                        firmeware_version = PiperFW.V188
-                elif self.is_nero:
-                    if current_version >= "1.11":
-                        firmeware_version = NeroFW.V111
-                
-                if firmeware_version != PiperFW.DEFAULT:
-                    self.agx_arm.disconnect()
-                    config = create_agx_arm_config(
-                        robot=self.arm_type, comm="can", channel=self.can_port,
-                        firmeware_version=firmeware_version
-                    )
-                    self.agx_arm = AgxArmFactory.create_arm(config)
-                    self.agx_arm.connect()
-            else:
-                self.get_logger().error("Failed to get firmware version")
-                exit(1)
+                break
+            time.sleep(0.005)
+        
+        if self.firmware:
+            current_version = self.firmware['software_version']
+            self.get_logger().info(f"firmware version: {current_version}")
+            firmeware_version = PiperFW.DEFAULT
+            if self.is_piper:
+                if current_version < "S-V1.8-5":
+                    self.is_switch_seamlessly = False
+                if current_version > "S-V1.8-2" and current_version < "S-V1.8-8":
+                    firmeware_version = PiperFW.V183
+                elif current_version >= "S-V1.8-8":
+                    firmeware_version = PiperFW.V188
+            elif self.is_nero:
+                if current_version == "1.11":
+                    firmeware_version = NeroFW.V111
+                elif current_version >= "1.12":
+                    firmeware_version = NeroFW.V112
+            
+            if firmeware_version != PiperFW.DEFAULT:
+                self.agx_arm.disconnect()
+                config = create_agx_arm_config(
+                    robot=self.arm_type, comm="can", channel=self.can_port,
+                    firmeware_version=firmeware_version
+                )
+                self.agx_arm = AgxArmFactory.create_arm(config)
+                self.agx_arm.connect()
+        else:
+            self.get_logger().error("Failed to get firmware version")
+            exit(1)
 
-            self.agx_arm.set_speed_percent(self.speed_percent)
-            self.agx_arm.set_tcp_offset(self.tcp_offset)
+        self.agx_arm.set_speed_percent(self.speed_percent)
+        self.agx_arm.set_tcp_offset(self.tcp_offset)
 
     def _init_effector(self):
         self.gripper: Optional[AgxGripperWrapper] = None
@@ -223,8 +228,8 @@ class AgxArmRosNode(Node):
         self.arm_status_pub = self.create_publisher(
             AgxArmStatus, "feedback/arm_status", 1
         )
-        self.leader_joint_angles_pub = self.create_publisher(
-            JointState, "feedback/leader_joint_angles", 1
+        self.leader_joint_states_pub = self.create_publisher(
+            JointState, "feedback/leader_joint_states", 1
         )
         if self.gripper is not None:
             self.gripper_status_pub = self.create_publisher(
@@ -353,7 +358,7 @@ class AgxArmRosNode(Node):
                     f"Timeout waiting for arm to {action_name} after {timeout} seconds"
                 )
                 return False
-            time.sleep(0.01)
+            time.sleep(1)
         
         joints_status = self.agx_arm.get_joint_enable_status(255)
         all_joints_in_target_status = joints_status if enable else not joints_status
@@ -384,7 +389,7 @@ class AgxArmRosNode(Node):
                 self._publish_pose()
                 self._publish_arm_status()
                 self._publish_effector_status()
-                self._publish_leader_joint_angles()
+                self._publish_leader_joint_states()
             rate.sleep()
     
     ### publish methods
@@ -404,6 +409,25 @@ class AgxArmRosNode(Node):
 
         return [
             (name, status.width * scale, 0.0, status.force)
+            for name, scale in gripper_joint_map.items()
+        ]
+
+    def _get_gripper_joint_ctrl_data(self):
+        if self.gripper is None:
+            return []
+        ctrl_states = self.gripper.get_ctrl_states()
+        if ctrl_states is None:
+            return []
+
+        gripper_joint_map = {
+            "gripper_joint1":     0.5,
+            "gripper_joint2":    -0.5,
+        }
+        if self.publish_gripper_joint:
+            gripper_joint_map[GRIPPER_JOINT_NAME] = 1.0
+
+        return [
+            (name, ctrl_states.width * scale, 0.0, ctrl_states.force)
             for name, scale in gripper_joint_map.items()
         ]
 
@@ -503,18 +527,29 @@ class AgxArmRosNode(Node):
 
         self.arm_status_pub.publish(msg)
 
-    def _publish_leader_joint_angles(self):
+    def _publish_leader_joint_states(self):
         leader_joint_angles = self.agx_arm.get_leader_joint_angles()
         if leader_joint_angles is None:
             return
 
         msg = JointState()
         msg.header.stamp = self._float_to_ros_time(leader_joint_angles.timestamp)
-        msg.name = self.arm_joint_names
-        msg.position = leader_joint_angles.msg
-        msg.velocity = [0.0] * self.arm_joint_count
-        msg.effort = [0.0] * self.arm_joint_count
-        self.leader_joint_angles_pub.publish(msg)
+        names = list(self.arm_joint_names)
+        positions = list(leader_joint_angles.msg)
+        velocity = [0.0] * self.arm_joint_count
+        effort = [0.0] * self.arm_joint_count
+
+        for name, pos, vel, eff in self._get_gripper_joint_ctrl_data():
+            names.append(name)
+            positions.append(pos)
+            velocity.append(vel)
+            effort.append(eff)
+
+        msg.name = names
+        msg.position = positions
+        msg.velocity = velocity
+        msg.effort = effort
+        self.leader_joint_states_pub.publish(msg)
 
     def _publish_gripper_status(self):
         status = self.gripper.get_status()

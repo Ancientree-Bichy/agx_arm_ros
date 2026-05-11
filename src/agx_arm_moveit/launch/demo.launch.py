@@ -125,6 +125,7 @@ def _build_moveit(context):
     arm_type = LaunchConfiguration("arm_type").perform(context)
     effector_type = LaunchConfiguration("effector_type").perform(context)
     revo2_type = LaunchConfiguration("revo2_type").perform(context)
+    control_topic = LaunchConfiguration("control_topic").perform(context)
     moveit_config = build_moveit_config(context)
     package_path = moveit_config.package_path
 
@@ -186,7 +187,7 @@ def _build_moveit(context):
                 moveit_config.robot_description,
                 ros2_controllers_yaml,
             ],
-            remappings=[("joint_states", "control/joint_states")],
+            remappings=[("joint_states", str(control_topic))],
         )
     )
 
@@ -245,8 +246,8 @@ def generate_launch_description():
                 default_value="false",
                 choices=["true", "false"],
                 description="Follow real arm state. "
-                "true: move_group subscribes to feedback/joint_states; "
-                "false: subscribes to control/joint_states (mock hardware).",
+                "true: move_group subscribes to feedback_topic; "
+                "false: subscribes to control_topic (mock hardware).",
             ),
             DeclareBooleanLaunchArg(
                 "db",

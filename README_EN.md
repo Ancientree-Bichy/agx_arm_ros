@@ -206,10 +206,10 @@ ros2 launch agx_arm_ctrl start_single_agx_arm_rviz.launch.py can_port:=can0 arm_
 ```
 
 > **Note:**
-> - `start_single_agx_arm_rviz.launch.py` subscribes to the `/feedback/joint_states` topic. The parameter `control` controls whether RViz-side joint_state_publisher publishes to `control_topic` (default `control_topic:=/control/joint_states`, and default `control:=false`, so no control topics are published from RViz).
-> - `follow` controls whether RViz follows the real arm state; when set to `true`, real feedback is subscribed to drive the model display.
+> - `start_single_agx_arm_rviz.launch.py` subscribes to joint states based on `follow`: when `follow:=true`, it subscribes to `feedback_topic` (default: `feedback/joint_states`); when `follow:=false`, it subscribes to `control_topic` (default: `control/joint_states`). The `control` parameter controls whether RViz-side joint_state_publisher publishes to `control_topic` (default `control:=false`, so no control topics are published from RViz).
+> - `follow` controls whether RViz follows the real arm state; when set to `true`, `feedback_topic` is used to drive the model display.
 > - If you only want to visualize and follow the real arm state, it is recommended to keep `control:=false`.
-> - If you want to use RViz joint sliders to publish to `control_topic` (default `/control/joint_states`), explicitly set `control:=true`. In this case, it may conflict with the control commands in [Control Examples](#control-examples).
+> - If you want to use RViz joint sliders to publish to `control_topic` (default `control/joint_states`), explicitly set `control:=true`. In this case, it may conflict with the control commands in [Control Examples](#control-examples).
 
 **MoveIt One-Click Launch (Arm Control + MoveIt + RViz):**
 
@@ -217,7 +217,7 @@ ros2 launch agx_arm_ctrl start_single_agx_arm_rviz.launch.py can_port:=can0 arm_
 ros2 launch agx_arm_ctrl start_single_agx_arm_moveit.launch.py can_port:=can0 arm_type:=piper effector_type:=agx_gripper
 ```
 
-> This launch file starts both the arm control node and MoveIt2 simultaneously, automatically connecting joint feedback (`/feedback/joint_states`) to MoveIt. No need to start two terminals separately. Supports all `agx_arm_ctrl` parameters (e.g. `tcp_offset`, `speed_percent`, etc.). See [Moveit](./src/agx_arm_moveit/README_EN.md) for details.
+> This launch file starts both the arm control node and MoveIt2 simultaneously. By default, it connects joint feedback via `feedback_topic:=feedback/joint_states`, and also supports custom topics through `feedback_topic`/`control_topic`. No need to start two terminals separately. Supports all `agx_arm_ctrl` parameters (e.g. `tcp_offset`, `speed_percent`, etc.). See [Moveit](./src/agx_arm_moveit/README_EN.md) for details.
 
 ### Launch Parameters
 
@@ -276,10 +276,11 @@ ros2 launch agx_arm_description display.launch.py arm_type:=piper
 | `pub_rate` | `200` | Status publish rate (Hz) |
 | `gui` | `true` | Whether to enable the `joint_state_publisher_gui` slider control interface |
 | `rvizconfig` | Built-in config | Absolute path to a custom RViz configuration file |
-| `follow` | `false` | Whether to follow the real arm state (subscribe to `/feedback/joint_states`, and remap `/joint_states` to `feedback/joint_states` in `robot_state_publisher`) |
+| `follow` | `false` | Whether to follow the real arm state (`true`: subscribe to `feedback_topic`; `false`: subscribe to `control_topic`, and remap `/joint_states` in `robot_state_publisher`) |
 | `tcp_offset` | `[0.0, 0.0, 0.0, 0.0, 0.0, 0.0]` | TCP offset [x, y, z, rx, ry, rz] in meters/radians. When non-zero, a `tcp_link` TF frame is published automatically |
 | `control` | `true` | Whether to publish control topics via `joint_state_publisher` (or GUI version). When `true`, publishes to `control_topic`; when `false`, only follows/displays without publishing control topics. A common real-arm combination is `follow:=true, control:=false` (follow real arm without sending control from RViz). |
-| `control_topic` | `/control/joint_states` | Target topic where `joint_state_publisher_gui` publishes joint slider outputs |
+| `feedback_topic` | `feedback/joint_states` | Joint feedback topic (used when `follow:=true`) |
+| `control_topic` | `control/joint_states` | Target topic where `joint_state_publisher_gui` publishes joint slider outputs, and the topic display-side subscribes to when `follow:=false` |
 
 #### Typical Usage Combinations (follow / control)
 
@@ -509,10 +510,10 @@ cd src/agx_arm_ros
     ros2 topic echo /feedback/arm_status
     ```
 
-4. Leader joint angles(For leader arm mode)
+4. Leader joint states (For leader arm mode)
 
     ```bash
-    ros2 topic echo /feedback/leader_joint_angles
+    ros2 topic echo /feedback/leader_joint_states
     ```
 
 5. Gripper status
@@ -538,7 +539,7 @@ cd src/agx_arm_ros
 | `/feedback/joint_states` | `sensor_msgs/JointState` | Joint states | Always available |
 | `/feedback/tcp_pose` | `geometry_msgs/PoseStamped` | TCP pose | Always available |
 | `/feedback/arm_status` | `agx_arm_msgs/AgxArmStatus` | Arm status | Always available |
-| `/feedback/leader_joint_angles` | `sensor_msgs/JointState` | Leader joint angles | Leader arm mode |
+| `/feedback/leader_joint_states` | `sensor_msgs/JointState` | Leader joint states | Leader arm mode |
 | `/feedback/gripper_status` | `agx_arm_msgs/GripperStatus` | Gripper status | AgxGripper configured |
 | `/feedback/hand_status` | `agx_arm_msgs/HandStatus` | Dexterous hand status | Revo2 configured |
 

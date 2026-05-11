@@ -18,7 +18,9 @@ from _moveit_config_builder import build_moveit_config, declare_common_args
 def _launch(context):
     moveit_config = build_moveit_config(context)
     follow = LaunchConfiguration("follow").perform(context) == "true"
-    joint_states_topic = "feedback/joint_states" if follow else "control/joint_states"
+    feedback_topic = LaunchConfiguration("feedback_topic").perform(context)
+    control_topic = LaunchConfiguration("control_topic").perform(context)
+    joint_states_topic = str(feedback_topic) if follow else str(control_topic)
 
     move_group_configuration = {
         "publish_robot_description_semantic": True,

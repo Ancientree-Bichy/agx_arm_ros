@@ -113,7 +113,7 @@ class AgxGripperWrapper:
             return None
         
         ctrl_status = GripperCtrlStatus(
-            width=gcs.msg.width,
+            width=gcs.msg.value,
             force=gcs.msg.force,
             status_code=gcs.msg.status_code,
             set_zero=gcs.msg.set_zero,

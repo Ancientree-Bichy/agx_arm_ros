@@ -1,4 +1,5 @@
 import ast
+import tempfile
 from pathlib import Path
 
 from ament_index_python.packages import get_package_share_path
@@ -56,6 +57,25 @@ def _flange_link(arm_type):
     return 'link7' if arm_type == 'nero' else 'link6'
 
 
+def _rviz_config_path_with_ns(template_path: str, ns: str) -> str:
+    """When ns is set, patch Fixed Frame / TF Prefix and return a temp file path."""
+    if not ns:
+        return template_path
+    text = Path(template_path).read_text(encoding='utf-8')
+    text = text.replace('Fixed Frame: base_link', f'Fixed Frame: {ns}/base_link')
+    text = text.replace('TF Prefix: ""', f'TF Prefix: "{ns}"')
+    tmp = tempfile.NamedTemporaryFile(
+        mode='w',
+        suffix='.rviz',
+        prefix=f'display_{ns}_',
+        delete=False,
+        encoding='utf-8',
+    )
+    tmp.write(text)
+    tmp.close()
+    return tmp.name
+
+
 def resolve_model_path(context, *args, **kwargs):
     namespace = LaunchConfiguration('namespace').perform(context)
     arm_type = LaunchConfiguration('arm_type').perform(context)
@@ -65,6 +85,7 @@ def resolve_model_path(context, *args, **kwargs):
     follow = LaunchConfiguration('follow').perform(context)
     control = LaunchConfiguration('control').perform(context)
     control_topic = LaunchConfiguration('control_topic').perform(context)
+    feedback_topic = LaunchConfiguration('feedback_topic').perform(context)
     tcp_offset = ast.literal_eval(
         LaunchConfiguration('tcp_offset').perform(context)
     )
@@ -79,14 +100,22 @@ def resolve_model_path(context, *args, **kwargs):
 
     robot_description = ParameterValue(Command(['xacro ', model_path]), value_type=str)
 
-    # When follow=true, use feedback/joint_states as the state source; otherwise use control_topic.
-    state_joint_topic = 'feedback/joint_states' if follow == 'true' else str(control_topic)
+    # When follow=true, use feedback_topic as the state source; otherwise use control_topic.
+    state_joint_topic = str(feedback_topic) if follow == 'true' else str(control_topic)
+
+    # Multi-arm: RSP needs frame_prefix (e.g. left/) so /tf frames differ; RViz RobotModel
+    # needs Fixed Frame = <ns>/base_link and TF Prefix = <ns> only (RViz adds one / between).
+    ns = namespace.strip()
+    frame_prefix = f'{ns}/' if ns else ''
+    rsp_params = {'robot_description': robot_description}
+    if frame_prefix:
+        rsp_params['frame_prefix'] = frame_prefix
 
     robot_state_publisher_node = Node(
         package='robot_state_publisher',
         executable='robot_state_publisher',
         namespace=namespace,
-        parameters=[{'robot_description': robot_description}],
+        parameters=[rsp_params],
         remappings=[('joint_states', state_joint_topic)]
     )
 
@@ -108,13 +137,16 @@ def resolve_model_path(context, *args, **kwargs):
         remappings=[('joint_states', str(control_topic))]
     )
 
+    rviz_cfg = _rviz_config_path_with_ns(
+        LaunchConfiguration('rvizconfig').perform(context), ns)
+
     rviz_node = Node(
         package='rviz2',
         executable='rviz2',
         name='rviz2',
         namespace=namespace,
         output='screen',
-        arguments=['-d', LaunchConfiguration('rvizconfig')],
+        arguments=['-d', rviz_cfg],
         remappings=[('/robot_description', 'robot_description')],
     )
 
@@ -132,6 +164,8 @@ def resolve_model_path(context, *args, **kwargs):
 
     if any(v != 0.0 for v in tcp_offset):
         flange = _flange_link(arm_type)
+        flange_frame = f'{frame_prefix}{flange}' if frame_prefix else flange
+        tcp_frame = f'{frame_prefix}tcp_link' if frame_prefix else 'tcp_link'
         x, y, z, rx, ry, rz = tcp_offset
         nodes.append(
             Node(
@@ -141,12 +175,13 @@ def resolve_model_path(context, *args, **kwargs):
                 arguments=[
                     '--x', str(x), '--y', str(y), '--z', str(z),
                     '--roll', str(rx), '--pitch', str(ry), '--yaw', str(rz),
-                    '--frame-id', flange, '--child-frame-id', 'tcp_link',
+                    '--frame-id', flange_frame, '--child-frame-id', tcp_frame,
                 ],
             )
         )
 
     return nodes
+
 
 def generate_launch_description():
     urdf_tutorial_path = get_package_share_path('agx_arm_description')
@@ -155,7 +190,8 @@ def generate_launch_description():
     namespace_arg = DeclareLaunchArgument(
         name='namespace',
         default_value='',
-        description='ROS namespace for this arm instance (e.g. arm1).'
+        description='Namespace for topics/nodes; when set, TF frame_prefix and RViz '
+                      'RobotModel (Fixed Frame / TF Prefix) are adjusted automatically.',
     )
     arm_type_arg = DeclareLaunchArgument(
         name='arm_type',
@@ -175,7 +211,7 @@ def generate_launch_description():
         description='End effector type (e.g. agx_gripper, revo2).'
     )
     revo2_type_arg = DeclareLaunchArgument(
-       'revo2_type',
+        'revo2_type',
         default_value='left',
         choices=['left', 'right'],
         description='Revo2 end effector type (e.g. left, right).'
@@ -202,6 +238,11 @@ def generate_launch_description():
         default_value='control/joint_states',
         description='Topic to publish joint slider targets (from joint_state_publisher_gui).',
     )
+    feedback_topic_arg = DeclareLaunchArgument(
+        name='feedback_topic',
+        default_value='feedback/joint_states',
+        description='Topic to subscribe as the feedback joint states (used when follow:=true).',
+    )
     tcp_offset_arg = DeclareLaunchArgument(
         'tcp_offset',
         default_value='[0.0, 0.0, 0.0, 0.0, 0.0, 0.0]',
@@ -221,6 +262,7 @@ def generate_launch_description():
         follow_arg,
         control_arg,
         control_topic_arg,
+        feedback_topic_arg,
         tcp_offset_arg,
         OpaqueFunction(function=resolve_model_path),
     ])

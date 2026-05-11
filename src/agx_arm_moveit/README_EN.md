@@ -128,7 +128,7 @@ ros2 launch agx_arm_ctrl start_single_agx_arm_moveit.launch.py can_port:=can0 ar
 ```
 
 > This launch supports all `agx_arm_ctrl` parameters (e.g. `tcp_offset`, `speed_percent`, `auto_enable`, etc.). See [agx_arm_ctrl Launch Parameters](../../README_EN.md#launch-parameters) for details.
-> - `follow` defaults to `true`, so MoveIt automatically subscribes to `/feedback/joint_states` to track real arm state
+> - `follow` defaults to `true`, so MoveIt subscribes to `feedback_topic` (default: `feedback/joint_states`) to track real arm state
 > - `publish_gripper_joint` is automatically set to `false`, suppressing the `gripper` (opening width) joint that does not exist in the URDF, preventing MoveIt warnings
 > - For multi-arm parallel use, you can set `namespace` for this launch (e.g. `namespace:=piper_x`)
 
@@ -157,7 +157,9 @@ ros2 launch agx_arm_moveit demo.launch.py arm_type:=nero effector_type:=revo2 re
 | `effector_type` | `none` | End-effector type | `none`, `agx_gripper`, `revo2` |
 | `revo2_type` | `left` | Revo2 dexterous hand type | `left`, `right` |
 | `namespace` | empty string | Namespace for the current MoveIt/control instance (recommended for multi-instance setups) | Any valid ROS namespace |
-| `follow` | `false` | Follow real arm state (`true`: MoveIt subscribes to `/feedback/joint_states`; `false`: subscribes to `/control/joint_states`) | `true`, `false` |
+| `follow` | `false` | Follow real arm state (`true`: MoveIt subscribes to `feedback_topic`; `false`: subscribes to `control_topic`) | `true`, `false` |
+| `feedback_topic` | `feedback/joint_states` | Joint feedback topic (used when `follow:=true`) | Any valid ROS topic |
+| `control_topic` | `control/joint_states` | Joint control topic (used when `follow:=false`, and for ros2_control `joint_states` remap) | Any valid ROS topic |
 | `tcp_offset` | `[0.0, 0.0, 0.0, 0.0, 0.0, 0.0]` | TCP offset [x, y, z, rx, ry, rz] in meters/radians. When non-zero, the planning target and interactive marker align with the TCP position | - |
 | `use_rviz` | `true` | Whether to launch RViz | `true`, `false` |
 | `db` | `false` | Whether to start MoveIt warehouse database | `true`, `false` |
@@ -168,7 +170,7 @@ Based on the `follow` parameter, below are common MoveIt usage patterns:
 
 - **Scenario A: Pure simulation, no real arm**  
   - Goal: Run MoveIt + RViz for visualization and planning only, without connecting to real hardware.  
-  - Configuration: `follow:=false` (default). MoveIt subscribes to `/control/joint_states` and runs entirely in simulation.  
+  - Configuration: `follow:=false` (default). MoveIt subscribes to `control_topic` (default: `control/joint_states`) and runs entirely in simulation.  
   - Example:  
     ```bash
     # Simulation only, no real arm
@@ -176,20 +178,20 @@ Based on the `follow` parameter, below are common MoveIt usage patterns:
     ```
 
 - **Scenario B: Real arm + control only, no follow** (MoveIt as high-level controller, not strictly synced to real feedback)  
-  - Goal: Use MoveIt to plan and publish `/control/joint_states` to the real arm, while RViz mainly reflects the commanded state (not recommended for long-term precise use).  
-  - Configuration: `follow:=false`. MoveIt still subscribes to `/control/joint_states`, and `agx_arm_ctrl` executes the commands on the real arm.  
+  - Goal: Use MoveIt to plan and publish through `control_topic` to the real arm, while RViz mainly reflects the commanded state (not recommended for long-term precise use).  
+  - Configuration: `follow:=false`. MoveIt subscribes to `control_topic` (default: `control/joint_states`), and `agx_arm_ctrl` executes the commands on the real arm.  
   - Example:  
     ```bash
     # Terminal 1: start real arm control
     ros2 launch agx_arm_ctrl start_single_agx_arm.launch.py can_port:=can0 arm_type:=piper effector_type:=agx_gripper
 
-    # Terminal 2: MoveIt plans and publishes /control/joint_states, does not subscribe to /feedback/joint_states
+    # Terminal 2: MoveIt plans and publishes control_topic, does not subscribe to feedback_topic
     ros2 launch agx_arm_moveit demo.launch.py arm_type:=piper effector_type:=agx_gripper follow:=false
     ```
 
 - **Scenario C: Real arm + control + follow (recommended for real hardware)**  
   - Goal: MoveIt plans and controls the real arm, while RViz stays synchronized with the real joint feedback.  
-  - Configuration: `follow:=true`. MoveIt subscribes to `/feedback/joint_states` and uses real joint feedback as the primary state.  
+  - Configuration: `follow:=true`. MoveIt subscribes to `feedback_topic` (default: `feedback/joint_states`) and uses real joint feedback as the primary state.  
   - Example 1 (recommended one-click launch, already described above):  
     ```bash
     ros2 launch agx_arm_ctrl start_single_agx_arm_moveit.launch.py can_port:=can0 arm_type:=piper effector_type:=agx_gripper
@@ -199,7 +201,7 @@ Based on the `follow` parameter, below are common MoveIt usage patterns:
     # Terminal 1: start real arm control
     ros2 launch agx_arm_ctrl start_single_agx_arm.launch.py can_port:=can0 arm_type:=piper effector_type:=agx_gripper
 
-    # Terminal 2: MoveIt subscribes to /feedback/joint_states (control + follow)
+    # Terminal 2: MoveIt subscribes to feedback_topic (control + follow)
     ros2 launch agx_arm_moveit demo.launch.py arm_type:=piper effector_type:=agx_gripper follow:=true
     ```
 

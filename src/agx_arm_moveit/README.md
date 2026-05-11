@@ -126,7 +126,7 @@ ros2 launch agx_arm_ctrl start_single_agx_arm_moveit.launch.py can_port:=can0 ar
 ```
 
 > 该 launch 支持所有 `agx_arm_ctrl` 参数（如 `tcp_offset`、`speed_percent`、`auto_enable` 等），详见 [agx_arm_ctrl 启动参数](../../README.md#启动参数)。
-> - `follow` 默认为 `true`，MoveIt 自动订阅 `/feedback/joint_states` 跟随真实臂状态
+> - `follow` 默认为 `true`，MoveIt 会订阅 `feedback_topic`（默认 `feedback/joint_states`）跟随真实臂状态
 > - `publish_gripper_joint` 自动设为 `false`，不发布 `gripper`（夹爪宽度）关节，避免 URDF 中不存在该关节名导致的 MoveIt 告警
 > - 需要多机械臂并行时，可为该 launch 指定 `namespace`（例如 `namespace:=piper_x`）
 
@@ -155,7 +155,9 @@ ros2 launch agx_arm_moveit demo.launch.py arm_type:=nero effector_type:=revo2 re
 | `effector_type` | `none` | 末端执行器类型 | `none`, `agx_gripper`, `revo2` |
 | `revo2_type` | `left` | Revo2 灵巧手类型 | `left`, `right` |
 | `namespace` | 空字符串 | 当前 MoveIt/控制实例命名空间（多实例推荐设置） | 任意合法 ROS 命名空间 |
-| `follow` | `false` | 跟随真实机械臂状态（`true` 时 MoveIt 订阅 `/feedback/joint_states`；`false` 时订阅 `/control/joint_states`） | `true`, `false` |
+| `follow` | `false` | 跟随真实机械臂状态（`true` 时 MoveIt 订阅 `feedback_topic`；`false` 时订阅 `control_topic`） | `true`, `false` |
+| `feedback_topic` | `feedback/joint_states` | 反馈关节状态话题（`follow:=true` 时使用） | 任意合法 ROS topic |
+| `control_topic` | `control/joint_states` | 控制关节状态话题（`follow:=false` 时使用，并用于 ros2_control joint_states remap） | 任意合法 ROS topic |
 | `tcp_offset` | `[0.0, 0.0, 0.0, 0.0, 0.0, 0.0]` | TCP 偏移 [x, y, z, rx, ry, rz]（米/弧度），非零时规划目标和交互标记移至 TCP 位置 | - |
 | `use_rviz` | `true` | 是否启动 RViz | `true`, `false` |
 | `db` | `false` | 是否启动 MoveIt warehouse 数据库 | `true`, `false` |
@@ -166,7 +168,7 @@ ros2 launch agx_arm_moveit demo.launch.py arm_type:=nero effector_type:=revo2 re
 
 - **场景 A：纯模型，无真机（仿真演示）**  
   - 需求：只在 RViz+MoveIt 里看模型、规划轨迹，不连真机。  
-  - 配置：`follow:=false`（默认），MoveIt 订阅 `/control/joint_states`，完全在仿真侧运行。  
+  - 配置：`follow:=false`（默认），MoveIt 订阅 `control_topic`（默认 `control/joint_states`），完全在仿真侧运行。  
   - 示例：  
     ```bash
     # 仅仿真，不接入真实机械臂
@@ -174,20 +176,20 @@ ros2 launch agx_arm_moveit demo.launch.py arm_type:=nero effector_type:=revo2 re
     ```
 
 - **场景 B：真机 + 仅控制不跟随（MoveIt 作为“上位机控制器”，不实时显示真实反馈）**  
-  - 需求：MoveIt 规划并通过 `/control/joint_states` 控制真机，但 RViz 中的状态主要由 MoveIt 自己维护，对真机反馈不敏感（一般不推荐长期这样用，仅用于简单测试）。  
-  - 配置：`follow:=false`，MoveIt 仍订阅 `/control/joint_states`，由 `agx_arm_ctrl` 将控制结果执行到真机。  
+  - 需求：MoveIt 规划并通过 `control_topic` 控制真机，但 RViz 中的状态主要由 MoveIt 自己维护，对真机反馈不敏感（一般不推荐长期这样用，仅用于简单测试）。  
+  - 配置：`follow:=false`，MoveIt 订阅 `control_topic`（默认 `control/joint_states`），由 `agx_arm_ctrl` 将控制结果执行到真机。  
   - 示例：  
     ```bash
     # 终端1：启动真机控制
     ros2 launch agx_arm_ctrl start_single_agx_arm.launch.py can_port:=can0 arm_type:=piper effector_type:=agx_gripper
 
-    # 终端2：MoveIt 规划并发 /control/joint_states，不订阅 /feedback/joint_states
+    # 终端2：MoveIt 规划并发 control_topic，不订阅 feedback_topic
     ros2 launch agx_arm_moveit demo.launch.py arm_type:=piper effector_type:=agx_gripper follow:=false
     ```
 
 - **场景 C：真机 + 控制 + 跟随（推荐实机方案）**  
-  - 需求：MoveIt 规划控制真实机械臂，同时 RViz 中的模型实时跟随 `/feedback/joint_states`。  
-  - 配置：`follow:=true`，MoveIt 改为订阅 `/feedback/joint_states`，以真实关节反馈为主。  
+  - 需求：MoveIt 规划控制真实机械臂，同时 RViz 中的模型实时跟随 `feedback_topic`。  
+  - 配置：`follow:=true`，MoveIt 改为订阅 `feedback_topic`（默认 `feedback/joint_states`），以真实关节反馈为主。  
   - 示例 1（推荐一键启动，已在本 README 顶部介绍）：  
     ```bash
     ros2 launch agx_arm_ctrl start_single_agx_arm_moveit.launch.py can_port:=can0 arm_type:=piper effector_type:=agx_gripper
@@ -197,7 +199,7 @@ ros2 launch agx_arm_moveit demo.launch.py arm_type:=nero effector_type:=revo2 re
     # 终端1：启动真机控制
     ros2 launch agx_arm_ctrl start_single_agx_arm.launch.py can_port:=can0 arm_type:=piper effector_type:=agx_gripper
 
-    # 终端2：MoveIt 订阅 /feedback/joint_states，控制 + 跟随
+    # 终端2：MoveIt 订阅 feedback_topic，控制 + 跟随
     ros2 launch agx_arm_moveit demo.launch.py arm_type:=piper effector_type:=agx_gripper follow:=true
     ```
 
