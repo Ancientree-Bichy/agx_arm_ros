@@ -294,8 +294,6 @@ ros2 launch agx_arm_description display.launch.py arm_type:=piper
     ros2 launch agx_arm_description display.launch.py arm_type:=piper follow:=false control:=true
     ```
 
-> 说明：若希望把 RViz 滑动条发布的关节目标重定向给阻抗控制器（例如 `agx_arm_impedance` 的关节阻抗 `control_type:=joint_impedance`），可在启动 `display.launch.py` 时设置 `control:=true` 且 `control_topic:=/impedance/target_joint`。
-
 - **场景 2：真机 + 仅控制不跟随**（从 RViz 发控制，但 RViz 不显示真实反馈）  
   - 是否需要真机：是  
   - 推荐配置：`follow:=false, control:=true`  

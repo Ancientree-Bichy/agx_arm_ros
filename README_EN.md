@@ -294,8 +294,6 @@ Below are **common usage scenarios** with recommended `follow` and `control` com
     ros2 launch agx_arm_description display.launch.py arm_type:=piper follow:=false control:=true
     ```
 
-> Note: If you want to redirect RViz slider joint targets to an impedance controller (e.g. `agx_arm_impedance` joint impedance with `control_type:=joint_impedance`), start `display.launch.py` with `control:=true` and `control_topic:=/impedance/target_joint`.
-
 - **Scenario 2: Real arm + control only, no follow** (use RViz to send control, but RViz does not follow real feedback)  
   - Real arm required: Yes  
   - Recommended configuration: `follow:=false, control:=true`  
