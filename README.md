@@ -235,6 +235,7 @@ ros2 launch agx_arm_ctrl start_single_agx_arm_moveit.launch.py can_port:=can0 ar
 | `tcp_offset` | `[0.0, 0.0, 0.0, 0.0, 0.0, 0.0]` | 工具中心(TCP)相对法兰盘中心的偏移 [x, y, z, rx, ry, rz] | - |
 | `gripper_default_effort` | `1.0` | 夹爪默认力（单位：N） | `>=0.0` |
 | `publish_gripper_joint` | `true` | 是否在 `/feedback/joint_states` 中发布 `gripper` 关节（夹爪开口宽度）。与 MoveIt 联用时设为 `false`，因 URDF 中仅有 `gripper_joint1`/`gripper_joint2` | `true`, `false` |
+| `control_enabled` | `true` | 是否接收 `/control/*` 指令。设为 `false` 时会拒绝控制话题，仅保留反馈发布 | `true`, `false` |
 | `log_level` | `info` | 日志级别 | `debug`, `info`, `warn`, `error`, `fatal` |
 
 ### URDF 模型可视化
@@ -878,6 +879,7 @@ ros2 topic pub /control/joint_states sensor_msgs/msg/JointState \
 | 服务 | 类型 | 说明 | 适用条件 |
 |------|------|------|----------|
 | `/enable_agx_arm` | `std_srvs/SetBool` | 使能/失能机械臂 | 始终可用 |
+| `/control_enable` | `std_srvs/SetBool` | 开启/关闭 `/control/*` 控制门控 | 始终可用 |
 | `/move_home` | `std_srvs/Empty` | 回零位 | 始终可用 |
 | `/emergency_stop` | `std_srvs/Empty` | 急停（保持当前位置） | 始终可用 |
 | `/exit_teach_mode` | `std_srvs/Empty` | 退出示教模式 | Piper 系列 |

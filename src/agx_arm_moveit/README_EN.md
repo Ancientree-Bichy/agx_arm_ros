@@ -130,7 +130,55 @@ ros2 launch agx_arm_ctrl start_single_agx_arm_moveit.launch.py can_port:=can0 ar
 > This launch supports all `agx_arm_ctrl` parameters (e.g. `tcp_offset`, `speed_percent`, `auto_enable`, etc.). See [agx_arm_ctrl Launch Parameters](../../README_EN.md#launch-parameters) for details.
 > - `follow` defaults to `true`, so MoveIt subscribes to `feedback_topic` (default: `feedback/joint_states`) to track real arm state
 > - `publish_gripper_joint` is automatically set to `false`, suppressing the `gripper` (opening width) joint that does not exist in the URDF, preventing MoveIt warnings
+> - `auto_control_gate` defaults to `false`: automatic gating is disabled by default; in this mode, `control_enabled` is automatically set to `true` (control allowed).
+> - When `auto_control_gate:=true`: `agx_arm_control_gate` is launched and `control_enabled` is automatically set to `false`; the `SetBool` service named by `control_gate_service` is toggled during execution (default `control_enable`, matching `agx_arm_ctrl`; override per arm when running multiple instances).
 > - For multi-arm parallel use, you can set `namespace` for this launch (e.g. `namespace:=piper_x`)
+
+#### 3.2.1 MoveIt Gating Mechanism (`auto_control_gate`)
+
+To avoid continuous control-topic occupation of the real arm while MoveIt is idle, `start_single_agx_arm_moveit.launch.py` provides execution-phase control gating:
+
+- **Gate service**: `std_srvs/SetBool`, provided by `agx_arm_ctrl`. In `demo.launch.py`, **`control_gate_service`** selects the service name passed to `agx_arm_control_gate` as `gate_service_name` (default `control_enable`). Relative names resolve under this launch's namespace; use a **`/...` absolute service name** to target a specific arm instance.
+- **Driver parameter**: `control_enabled`
+- **MoveIt gate node**: `agx_arm_control_gate` (located in `agx_arm_moveit/scripts`)
+
+How it works:
+
+1. When `auto_control_gate:=false` (default), the auto gate node is not started, and `control_enabled` is automatically set to `true` (control path always open).
+2. When `auto_control_gate:=true`, the auto gate node monitors `arm_controller/follow_joint_trajectory` execution status and toggles the service given by **`control_gate_service`** only during execution (open while executing, close after completion).
+
+When combined with `follow:=true`, MoveIt subscribes to `/feedback/joint_states` and plans against the real joint state, so planning/execution is based on the arm's current physical pose; however, execution still depends on state update timing and start-state consistency checks.
+
+Recommended scenarios:
+
+- **Scenario A (default, fast iteration)**: frequent debugging and repeated execution, prioritizing convenience  
+  Use `auto_control_gate:=false`
+- **Scenario B (real-arm safety first)**: allow control only during actual execution to reduce idle occupation risk  
+  Use `auto_control_gate:=true`
+
+Launch examples:
+
+```bash
+# Scenario A: default (auto gate disabled, control always open)
+ros2 launch agx_arm_ctrl start_single_agx_arm_moveit.launch.py \
+  can_port:=can0 arm_type:=piper effector_type:=agx_gripper
+
+# Scenario B: execution-phase automatic gating (recommended for real hardware)
+ros2 launch agx_arm_ctrl start_single_agx_arm_moveit.launch.py \
+  can_port:=can0 arm_type:=piper effector_type:=agx_gripper auto_control_gate:=true
+```
+
+Manual gate control for debugging:
+
+```bash
+# Open gate (allow /control/*); default service is /control_enable at root namespace
+ros2 service call /control_enable std_srvs/srv/SetBool "{data: true}"
+
+# Close gate (block /control/*)
+ros2 service call /control_enable std_srvs/srv/SetBool "{data: false}"
+```
+
+With `namespace:=left`, the service is typically **`/left/control_enable`**. If you set a custom `control_gate_service`, replace the service name in the commands above with the fully resolved name.
 
 #### Option 2: Step-by-Step Launch
 
@@ -161,6 +209,8 @@ ros2 launch agx_arm_moveit demo.launch.py arm_type:=nero effector_type:=revo2 re
 | `feedback_topic` | `feedback/joint_states` | Joint feedback topic (used when `follow:=true`) | Any valid ROS topic |
 | `control_topic` | `control/joint_states` | Joint control topic (used when `follow:=false`, and for ros2_control `joint_states` remap) | Any valid ROS topic |
 | `tcp_offset` | `[0.0, 0.0, 0.0, 0.0, 0.0, 0.0]` | TCP offset [x, y, z, rx, ry, rz] in meters/radians. When non-zero, the planning target and interactive marker align with the TCP position | - |
+| `auto_control_gate` | `false` | Enable MoveIt execution-phase automatic control gating (toggle `/control/*` via the service named by `control_gate_service`) | `true`, `false` |
+| `control_gate_service` | `control_enable` | Only when `auto_control_gate:=true`: passed to `agx_arm_control_gate` as `gate_service_name` — the `std_srvs/SetBool` service basename or absolute name (must match the gate service exposed by `agx_arm_ctrl`) | Any valid service name |
 | `use_rviz` | `true` | Whether to launch RViz | `true`, `false` |
 | `db` | `false` | Whether to start MoveIt warehouse database | `true`, `false` |
 

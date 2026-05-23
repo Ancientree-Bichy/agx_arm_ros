@@ -128,7 +128,55 @@ ros2 launch agx_arm_ctrl start_single_agx_arm_moveit.launch.py can_port:=can0 ar
 > 该 launch 支持所有 `agx_arm_ctrl` 参数（如 `tcp_offset`、`speed_percent`、`auto_enable` 等），详见 [agx_arm_ctrl 启动参数](../../README.md#启动参数)。
 > - `follow` 默认为 `true`，MoveIt 会订阅 `feedback_topic`（默认 `feedback/joint_states`）跟随真实臂状态
 > - `publish_gripper_joint` 自动设为 `false`，不发布 `gripper`（夹爪宽度）关节，避免 URDF 中不存在该关节名导致的 MoveIt 告警
+> - `auto_control_gate` 默认为 `false`：默认不启用自动门控；此时会自动将 `control_enabled` 设为 `true`（允许控制）。
+> - 当 `auto_control_gate:=true` 时：会启动 `agx_arm_control_gate`，并将 `control_enabled` 自动设为 `false`，仅在轨迹执行阶段通过 `control_gate_service` 指定的 `SetBool` 服务自动开门（默认 `control_enable`，与 `agx_arm_ctrl` 提供的门控服务名一致；多臂时可自定义）。
 > - 需要多机械臂并行时，可为该 launch 指定 `namespace`（例如 `namespace:=piper_x`）
+
+#### 3.2.1 MoveIt 门控机制说明（`auto_control_gate`）
+
+为避免 MoveIt 空闲阶段持续发布控制相关话题对真机造成占用，`start_single_agx_arm_moveit.launch.py` 提供了执行期门控能力：
+
+- **门控服务**：`std_srvs/SetBool`，由 `agx_arm_ctrl` 提供；`demo.launch.py` 中通过 **`control_gate_service`** 指定门控节点要调用的服务名（默认 `control_enable`，映射到 `agx_arm_control_gate` 的 `gate_service_name`）。相对名会落在当前 launch 的命名空间下；也可用 **`/...` 绝对服务名** 显式指向某一臂实例。
+- **驱动参数**：`control_enabled`
+- **MoveIt 门控节点**：`agx_arm_control_gate`（位于 `agx_arm_moveit/scripts`）
+
+工作机制：
+
+1. 当 `auto_control_gate:=false`（默认）时，不启动自动门控节点，且 `control_enabled` 自动设为 `true`，控制链路常开。
+2. 当 `auto_control_gate:=true` 时，自动门控节点监听 `arm_controller/follow_joint_trajectory` 执行状态，仅在执行阶段通过 **`control_gate_service` 对应的服务** 开门，执行结束自动关门。
+
+与 `follow:=true` 搭配时，MoveIt 会订阅 `/feedback/joint_states`，以实机真实关节状态作为规划参考，从而在实机当前姿态附近进行规划与执行；但执行前仍受状态更新时间与起点一致性校验影响。
+
+推荐应用场景：
+
+- **场景 A（默认，快速联调）**：连续调试、频繁执行，优先易用性  
+  使用 `auto_control_gate:=false`
+- **场景 B（实机安全优先）**：希望只在真实执行时放行控制，降低空闲占用风险  
+  使用 `auto_control_gate:=true`
+
+启动示例：
+
+```bash
+# 场景 A：默认（自动门控关闭，控制常开）
+ros2 launch agx_arm_ctrl start_single_agx_arm_moveit.launch.py \
+  can_port:=can0 arm_type:=piper effector_type:=agx_gripper
+
+# 场景 B：执行期自动门控（推荐实机）
+ros2 launch agx_arm_ctrl start_single_agx_arm_moveit.launch.py \
+  can_port:=can0 arm_type:=piper effector_type:=agx_gripper auto_control_gate:=true
+```
+
+手动门控调试命令：
+
+```bash
+# 开门（允许 /control/*）；默认服务名为 /control_enable（根命名空间）
+ros2 service call /control_enable std_srvs/srv/SetBool "{data: true}"
+
+# 关门（拒绝 /control/*）
+ros2 service call /control_enable std_srvs/srv/SetBool "{data: false}"
+```
+
+若使用 `namespace:=left` 等，门控服务通常为 **`/left/control_enable`**；若自定义了 `control_gate_service`，请将上述命令中的服务名替换为实际全名。
 
 #### 方式二：分步启动
 
@@ -159,6 +207,8 @@ ros2 launch agx_arm_moveit demo.launch.py arm_type:=nero effector_type:=revo2 re
 | `feedback_topic` | `feedback/joint_states` | 反馈关节状态话题（`follow:=true` 时使用） | 任意合法 ROS topic |
 | `control_topic` | `control/joint_states` | 控制关节状态话题（`follow:=false` 时使用，并用于 ros2_control joint_states remap） | 任意合法 ROS topic |
 | `tcp_offset` | `[0.0, 0.0, 0.0, 0.0, 0.0, 0.0]` | TCP 偏移 [x, y, z, rx, ry, rz]（米/弧度），非零时规划目标和交互标记移至 TCP 位置 | - |
+| `auto_control_gate` | `false` | 是否启用 MoveIt 执行期自动门控（通过 `control_gate_service` 对应的服务开关 `/control/*`） | `true`, `false` |
+| `control_gate_service` | `control_enable` | 仅当 `auto_control_gate:=true` 有效：传给 `agx_arm_control_gate` 的 `gate_service_name`，即要调用的 `std_srvs/SetBool` 服务 basename 或绝对名（须与 `agx_arm_ctrl` 上实际门控服务一致） | 任意合法服务名 |
 | `use_rviz` | `true` | 是否启动 RViz | `true`, `false` |
 | `db` | `false` | 是否启动 MoveIt warehouse 数据库 | `true`, `false` |
 

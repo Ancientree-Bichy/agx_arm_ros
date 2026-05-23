@@ -125,7 +125,6 @@ def _build_moveit(context):
     arm_type = LaunchConfiguration("arm_type").perform(context)
     effector_type = LaunchConfiguration("effector_type").perform(context)
     revo2_type = LaunchConfiguration("revo2_type").perform(context)
-    control_topic = LaunchConfiguration("control_topic").perform(context)
     moveit_config = build_moveit_config(context)
     package_path = moveit_config.package_path
 
@@ -152,6 +151,22 @@ def _build_moveit(context):
             PythonLaunchDescriptionSource(
                 str(package_path / "launch/move_group.launch.py")
             )
+        )
+    )
+    actions.append(
+        Node(
+            package="agx_arm_moveit",
+            executable="agx_arm_control_gate",
+            output="screen",
+            parameters=[
+                {
+                    "status_topics": [
+                        "arm_controller/follow_joint_trajectory/_action/status",
+                    ],
+                    "gate_service_name": LaunchConfiguration("control_gate_service"),
+                }
+            ],
+            condition=IfCondition(LaunchConfiguration("auto_control_gate")),
         )
     )
 
@@ -187,7 +202,7 @@ def _build_moveit(context):
                 moveit_config.robot_description,
                 ros2_controllers_yaml,
             ],
-            remappings=[("joint_states", str(control_topic))],
+            remappings=[("joint_states", LaunchConfiguration("control_topic"))],
         )
     )
 
@@ -260,6 +275,16 @@ def generate_launch_description():
                 description="By default, we are not in debug mode",
             ),
             DeclareBooleanLaunchArg("use_rviz", default_value=True),
+            DeclareBooleanLaunchArg(
+                "auto_control_gate",
+                default_value=False,
+                description="Automatically gate /control commands during execute only.",
+            ),
+            DeclareLaunchArgument(
+                "control_gate_service",
+                default_value="control_enable",
+                description="SetBool gate service for agx_arm_control_gate (maps to gate_service_name).",
+            ),
             OpaqueFunction(function=_build_moveit),
         ]
     )

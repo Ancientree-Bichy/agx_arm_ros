@@ -235,6 +235,7 @@ ros2 launch agx_arm_ctrl start_single_agx_arm_moveit.launch.py can_port:=can0 ar
 | `tcp_offset` | `[0.0, 0.0, 0.0, 0.0, 0.0, 0.0]` | Tool Center Point (TCP) offset relative to the flange center [x, y, z, rx, ry, rz] | - |
 | `gripper_default_effort` | `1.0` | The default effort of the gripper (in N) | `>=0.0` |
 | `publish_gripper_joint` | `true` | Whether to publish the `gripper` joint (gripper opening width) in `/feedback/joint_states`. Set to `false` when used with MoveIt, as the URDF only defines `gripper_joint1`/`gripper_joint2` | `true`, `false` |
+| `control_enabled` | `true` | Whether to accept `/control/*` commands. When `false`, control topics are ignored and only feedback is published | `true`, `false` |
 | `log_level` | `info` | Log level | `debug`, `info`, `warn`, `error`, `fatal` |
 
 ### URDF Model Visualization
@@ -874,6 +875,7 @@ Message type: `agx_arm_msgs/HandPositionTimeCmd`
 | Service | Type | Description | Condition |
 |---------|------|-------------|-----------|
 | `/enable_agx_arm` | `std_srvs/SetBool` | Enable/disable arm | Always available |
+| `/control_enable` | `std_srvs/SetBool` | Open/close `/control/*` command gate | Always available |
 | `/move_home` | `std_srvs/Empty` | Move to home position | Always available |
 | `/emergency_stop` | `std_srvs/Empty` | Emergency stop (hold current position) | Always available |
 | `/exit_teach_mode` | `std_srvs/Empty` | Exit teach mode | Piper series |
