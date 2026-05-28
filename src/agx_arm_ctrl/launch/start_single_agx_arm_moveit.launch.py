@@ -2,7 +2,7 @@ from launch import LaunchDescription
 from launch.actions import (
     DeclareLaunchArgument, IncludeLaunchDescription,
 )
-from launch.substitutions import LaunchConfiguration, IfElseSubstitution
+from launch.substitutions import LaunchConfiguration, PythonExpression
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 import os
 from ament_index_python.packages import get_package_share_directory
@@ -149,11 +149,11 @@ def generate_launch_description():
             'tcp_offset': LaunchConfiguration('tcp_offset'),
             'gripper_default_effort': LaunchConfiguration('gripper_default_effort'),
             'publish_gripper_joint': 'false',
-            'control_enabled': IfElseSubstitution(
+            'control_enabled': PythonExpression([
+                "'false' if '",
                 LaunchConfiguration('auto_control_gate'),
-                if_value='false',
-                else_value='true',
-            ),
+                "' == 'true' else 'true'",
+            ]),
         }.items(),
     )
 

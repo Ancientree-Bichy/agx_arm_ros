@@ -21,9 +21,23 @@ find_package(ament_cmake REQUIRED)
 # further dependencies manually.
 # find_package(<dependency> REQUIRED)
 install(
-  DIRECTORY agx_arm_urdf launch rviz
+  DIRECTORY launch rviz
   DESTINATION share/${PROJECT_NAME}
 )
+
+if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/agx_arm_urdf/piper/urdf/piper_description.urdf")
+  install(
+    DIRECTORY agx_arm_urdf
+    DESTINATION share/${PROJECT_NAME}
+  )
+elseif(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/../../../agx_arm_urdf/piper/urdf/piper_description.urdf")
+  install(
+    DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/../../../agx_arm_urdf/"
+    DESTINATION share/${PROJECT_NAME}/agx_arm_urdf
+  )
+else()
+  message(WARNING "agx_arm_urdf directory not found; AGX arm description URDF files will not be installed")
+endif()
 if(BUILD_TESTING)
   find_package(ament_lint_auto REQUIRED)
   # the following line skips the linter which checks for copyrights
