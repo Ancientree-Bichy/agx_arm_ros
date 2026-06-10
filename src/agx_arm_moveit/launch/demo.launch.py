@@ -150,7 +150,10 @@ def _build_moveit(context):
         IncludeLaunchDescription(
             PythonLaunchDescriptionSource(
                 str(package_path / "launch/move_group.launch.py")
-            )
+            ),
+            launch_arguments={
+                "allowed_start_tolerance": LaunchConfiguration("allowed_start_tolerance"),
+            }.items(),
         )
     )
     actions.append(
@@ -284,6 +287,11 @@ def generate_launch_description():
                 "control_gate_service",
                 default_value="control_enable",
                 description="SetBool gate service for agx_arm_control_gate (maps to gate_service_name).",
+            ),
+            DeclareLaunchArgument(
+                "allowed_start_tolerance",
+                default_value="0.05",
+                description="MoveIt trajectory start-state tolerance in radians.",
             ),
             OpaqueFunction(function=_build_moveit),
         ]

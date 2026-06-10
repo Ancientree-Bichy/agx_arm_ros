@@ -44,6 +44,9 @@ def _launch(context):
             "publish_monitored_planning_scene"
         ),
         "monitor_dynamics": False,
+        "trajectory_execution.allowed_start_tolerance": ParameterValue(
+            LaunchConfiguration("allowed_start_tolerance"), value_type=float
+        ),
     }
 
     move_group_params = [
@@ -94,6 +97,7 @@ def generate_launch_description():
             DeclareBooleanLaunchArg("monitor_dynamics", default_value=False),
             DeclareLaunchArgument("capabilities", default_value=""),
             DeclareLaunchArgument("disable_capabilities", default_value=""),
+            DeclareLaunchArgument("allowed_start_tolerance", default_value="0.05"),
             OpaqueFunction(function=_launch),
         ]
     )

@@ -125,6 +125,17 @@ def generate_launch_description():
         default_value='control_enable',
         description='SetBool gate service for agx_arm_control_gate when auto_control_gate:=true.',
     )
+    allowed_start_tolerance_arg = DeclareLaunchArgument(
+        'allowed_start_tolerance',
+        default_value='0.05',
+        description='MoveIt trajectory start-state tolerance in radians.',
+    )
+    use_rviz_arg = DeclareLaunchArgument(
+        'use_rviz',
+        default_value='false',
+        choices=['true', 'false'],
+        description='Start the MoveIt RViz window.',
+    )
 
     # ── agx_arm_ctrl ─────────────────────────────────────────────────
     agx_arm_launch = IncludeLaunchDescription(
@@ -177,6 +188,8 @@ def generate_launch_description():
             'control_topic': LaunchConfiguration('control_topic'),
             'auto_control_gate': LaunchConfiguration('auto_control_gate'),
             'control_gate_service': LaunchConfiguration('control_gate_service'),
+            'allowed_start_tolerance': LaunchConfiguration('allowed_start_tolerance'),
+            'use_rviz': LaunchConfiguration('use_rviz'),
         }.items(),
     )
 
@@ -200,6 +213,8 @@ def generate_launch_description():
         control_topic_arg,
         auto_control_gate_arg,
         control_gate_service_arg,
+        allowed_start_tolerance_arg,
+        use_rviz_arg,
         # launches
         agx_arm_launch,
         moveit_launch,
